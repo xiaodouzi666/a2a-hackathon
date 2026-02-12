@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE_NAME } from '@/lib/session';
 import { exchangeCodeForToken, fetchSecondMeUserInfo } from '@/lib/mindos';
 import { verifyOAuthStateToken } from '@/lib/oauth-state';
+import { buildOAuthCallbackUrl } from '@/lib/app-origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const redirectUri = new URL('/api/auth/callback', request.url).toString();
+    const redirectUri = buildOAuthCallbackUrl(request.url);
     const tokenData = await exchangeCodeForToken({ code, redirectUri });
     const userInfo = await fetchSecondMeUserInfo(tokenData.access_token);
 

@@ -34,11 +34,12 @@ A2A 砍价擂台是一个双 Agent 自动谈判应用：
 DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<db>?sslmode=require"
 SECONDME_CLIENT_ID="你的 Client ID"
 SECONDME_CLIENT_SECRET="你的 Client Secret"
+BASE_URL="https://你的线上域名"
 OAUTH_STATE_SECRET="可选，建议单独配置一个长随机字符串"
 ```
 
 说明：
-- `BASE_URL` 已不再必填，OAuth 回调地址会自动按当前访问域名生成。
+- `BASE_URL` 建议在生产环境必填，用于固定 OAuth 回调域名，避免“回调地址不匹配”。
 - 未配置 `OAUTH_STATE_SECRET` 时，会默认使用 `SECONDME_CLIENT_SECRET` 作为 state 签名密钥。
 
 ## 五、本地运行步骤
