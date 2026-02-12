@@ -23,7 +23,7 @@ A2A 砍价擂台是一个双 Agent 自动谈判应用：
 ## 三、技术栈
 
 - 前端与服务端：Next.js 14（App Router）+ TypeScript
-- 数据库：Prisma + SQLite（本地开发）
+- 数据库：Prisma + PostgreSQL（建议 Neon/Supabase）
 - 身份与 Agent 能力：SecondMe OAuth 与 `chat/stream` 接口
 
 ## 四、环境变量
@@ -31,7 +31,7 @@ A2A 砍价擂台是一个双 Agent 自动谈判应用：
 在项目根目录创建 `.env.local`（或部署平台同名配置）：
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<db>?sslmode=require"
 SECONDME_CLIENT_ID="你的 Client ID"
 SECONDME_CLIENT_SECRET="你的 Client Secret"
 BASE_URL="http://localhost:3000"
@@ -41,7 +41,7 @@ BASE_URL="http://localhost:3000"
 
 ```bash
 npm install
-npx prisma migrate dev
+npx prisma db push
 npm run dev
 ```
 
