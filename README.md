@@ -34,8 +34,12 @@ A2A 砍价擂台是一个双 Agent 自动谈判应用：
 DATABASE_URL="postgresql://<user>:<password>@<host>:5432/<db>?sslmode=require"
 SECONDME_CLIENT_ID="你的 Client ID"
 SECONDME_CLIENT_SECRET="你的 Client Secret"
-BASE_URL="http://localhost:3000"
+OAUTH_STATE_SECRET="可选，建议单独配置一个长随机字符串"
 ```
+
+说明：
+- `BASE_URL` 已不再必填，OAuth 回调地址会自动按当前访问域名生成。
+- 未配置 `OAUTH_STATE_SECRET` 时，会默认使用 `SECONDME_CLIENT_SECRET` 作为 state 签名密钥。
 
 ## 五、本地运行步骤
 
@@ -78,8 +82,10 @@ npm run dev
 推荐部署到 Vercel 或 Zeabur：
 
 1. 配置全部环境变量
-2. 更新 OAuth 回调地址为线上域名
-3. 打开线上地址做一次完整演示流程检查
+2. Vercel Build Command 使用默认 `npm run build`（不要写 `prisma db push`）
+3. 数据库结构更新请在本地执行 `npx prisma db push` 后再部署
+4. 更新 OAuth 回调地址为线上域名
+5. 打开线上地址做一次完整演示流程检查
 
 ## 十、黑客松提交清单（可直接对照）
 

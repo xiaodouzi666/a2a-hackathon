@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { SESSION_COOKIE_NAME, getOAuthNextCookie, getOAuthStateCookie } from '@/lib/session';
+import { SESSION_COOKIE_NAME } from '@/lib/session';
 import { exchangeCodeForToken, fetchSecondMeUserInfo } from '@/lib/mindos';
+import { verifyOAuthStateToken } from '@/lib/oauth-state';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -12,13 +13,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing code/state' }, { status: 400 });
   }
 
-  const expectedState = getOAuthStateCookie();
-  if (!expectedState || expectedState !== state) {
+  const stateCheck = verifyOAuthStateToken(state);
+  if (!stateCheck.valid) {
     return NextResponse.json({ error: 'Invalid OAuth state' }, { status: 400 });
   }
 
   try {
-    const redirectUri = `${process.env.BASE_URL}/api/auth/callback`;
+    const redirectUri = new URL('/api/auth/callback', request.url).toString();
     const tokenData = await exchangeCodeForToken({ code, redirectUri });
     const userInfo = await fetchSecondMeUserInfo(tokenData.access_token);
 
@@ -47,27 +48,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const next = getOAuthNextCookie() || '/';
-    const response = NextResponse.redirect(new URL(next, request.url));
+    const response = NextResponse.redirect(new URL(stateCheck.nextPath, request.url));
 
     response.cookies.set(SESSION_COOKIE_NAME, user.id, {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
-    });
-
-    response.cookies.set('a2a_oauth_state', '', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    });
-    response.cookies.set('a2a_oauth_next', '', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
     });
 
     return response;
