@@ -10,7 +10,7 @@ export interface OAuthTokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
-  scope?: string;
+  scope?: string | string[];
   token_type?: string;
 }
 
@@ -40,6 +40,48 @@ function buildTokenForm(data: Record<string, string>) {
   const form = new URLSearchParams();
   Object.entries(data).forEach(([key, value]) => form.set(key, value));
   return form.toString();
+}
+
+function normalizeTokenResponse(raw: unknown): OAuthTokenResponse | null {
+  const root = raw as Record<string, unknown> | null;
+  if (!root || typeof root !== 'object') {
+    return null;
+  }
+
+  const payload = (root.data as Record<string, unknown>) ?? root;
+  const accessToken =
+    payload.access_token ??
+    payload.accessToken;
+
+  if (typeof accessToken !== 'string' || accessToken.length === 0) {
+    return null;
+  }
+
+  const refreshToken = payload.refresh_token ?? payload.refreshToken;
+  const expiresIn = payload.expires_in ?? payload.expiresIn;
+  const scope = payload.scope;
+  const tokenType = payload.token_type ?? payload.tokenType;
+  const parsedExpiresIn =
+    typeof expiresIn === 'number'
+      ? expiresIn
+      : typeof expiresIn === 'string' && expiresIn.trim() !== ''
+        ? Number(expiresIn)
+        : undefined;
+
+  return {
+    access_token: accessToken,
+    refresh_token: typeof refreshToken === 'string' ? refreshToken : undefined,
+    expires_in: typeof parsedExpiresIn === 'number' && !Number.isNaN(parsedExpiresIn) ? parsedExpiresIn : undefined,
+    scope: typeof scope === 'string' || Array.isArray(scope) ? (scope as string | string[]) : undefined,
+    token_type: typeof tokenType === 'string' ? tokenType : undefined,
+  };
+}
+
+function isBusinessSuccess(raw: unknown): boolean {
+  const root = raw as Record<string, unknown> | null;
+  if (!root || typeof root !== 'object') return true;
+  if (!('code' in root)) return true;
+  return root.code === 0 || root.code === '0';
 }
 
 export function buildSecondMeAuthorizeUrl(params: {
@@ -77,10 +119,11 @@ export async function exchangeCodeForToken(params: {
   });
 
   const data = await response.json();
-  if (!response.ok || !data.access_token) {
+  const normalized = normalizeTokenResponse(data);
+  if (!response.ok || !isBusinessSuccess(data) || !normalized) {
     throw new Error(`Token exchange failed: ${response.status} ${JSON.stringify(data)}`);
   }
-  return data;
+  return normalized;
 }
 
 export async function refreshSecondMeToken(refreshToken: string): Promise<OAuthTokenResponse> {
@@ -98,10 +141,11 @@ export async function refreshSecondMeToken(refreshToken: string): Promise<OAuthT
   });
 
   const data = await response.json();
-  if (!response.ok || !data.access_token) {
+  const normalized = normalizeTokenResponse(data);
+  if (!response.ok || !isBusinessSuccess(data) || !normalized) {
     throw new Error(`Token refresh failed: ${response.status} ${JSON.stringify(data)}`);
   }
-  return data;
+  return normalized;
 }
 
 export async function fetchSecondMeUserInfo(accessToken: string): Promise<SecondMeUserInfo> {
