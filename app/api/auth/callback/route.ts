@@ -4,6 +4,8 @@ import { SESSION_COOKIE_NAME } from '@/lib/session';
 import { exchangeCodeForToken, fetchSecondMeUserInfo } from '@/lib/mindos';
 import { verifyOAuthStateToken } from '@/lib/oauth-state';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
