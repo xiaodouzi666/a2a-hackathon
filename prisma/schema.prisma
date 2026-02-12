@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  mindosId       String    @unique
+  name           String
+  avatar         String?
+  bio            String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  hostedRooms Room[] @relation("Host")
+  joinedRooms Room[] @relation("Guest")
+  votes       Vote[]
+}
+
+model Room {
+  id              String   @id @default(uuid())
+  hostId          String
+  guestId         String?
+  itemName        String
+  description     String?
+  listPrice       Float
+  minPrice        Float // Hidden from guest
+  maxPrice        Float? // Set by guest, hidden from host
+  finalPrice      Float?
+  status          String   @default("WAITING")
+  isProcessing    Boolean  @default(false)
+  sellerSessionId String?
+  buyerSessionId  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  host     User      @relation("Host", fields: [hostId], references: [id])
+  guest    User?     @relation("Guest", fields: [guestId], references: [id])
+  messages Message[]
+  votes    Vote[]
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  roomId     String
+  sender     String
+  content    String
+  priceOffer Float?
+  round      Int
+  createdAt  DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id])
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  roomId    String
+  voterId   String
+  voteFor   String
+  createdAt DateTime @default(now())
+
+  room  Room @relation(fields: [roomId], references: [id])
+  voter User @relation(fields: [voterId], references: [id])
+
+  @@unique([roomId, voterId])
+}
