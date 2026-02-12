@@ -7,6 +7,15 @@ import { buildOAuthCallbackUrl } from '@/lib/app-origin';
 
 export const dynamic = 'force-dynamic';
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
@@ -21,16 +30,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid OAuth state' }, { status: 400 });
   }
 
+  const redirectUri = buildOAuthCallbackUrl(request.url);
+
+  let tokenData: Awaited<ReturnType<typeof exchangeCodeForToken>>;
   try {
-    const redirectUri = buildOAuthCallbackUrl(request.url);
-    const tokenData = await exchangeCodeForToken({ code, redirectUri });
-    const userInfo = await fetchSecondMeUserInfo(tokenData.access_token);
+    tokenData = await exchangeCodeForToken({ code, redirectUri });
+  } catch (error) {
+    const detail = getErrorMessage(error);
+    console.error('OAuth token exchange error:', detail);
+    return NextResponse.json(
+      { error: 'OAuth token exchange failed', detail, redirectUri },
+      { status: 500 },
+    );
+  }
 
-    const expiresAt = tokenData.expires_in
-      ? new Date(Date.now() + tokenData.expires_in * 1000)
-      : null;
+  let userInfo: Awaited<ReturnType<typeof fetchSecondMeUserInfo>>;
+  try {
+    userInfo = await fetchSecondMeUserInfo(tokenData.access_token);
+  } catch (error) {
+    const detail = getErrorMessage(error);
+    console.error('OAuth user info fetch error:', detail);
+    return NextResponse.json(
+      { error: 'OAuth user info failed', detail },
+      { status: 500 },
+    );
+  }
 
-    const user = await prisma.user.upsert({
+  const expiresAt = tokenData.expires_in
+    ? new Date(Date.now() + tokenData.expires_in * 1000)
+    : null;
+
+  let user;
+  try {
+    user = await prisma.user.upsert({
       where: { mindosId: userInfo.id },
       update: {
         name: userInfo.name,
@@ -50,19 +82,23 @@ export async function GET(request: NextRequest) {
         tokenExpiresAt: expiresAt,
       },
     });
-
-    const response = NextResponse.redirect(new URL(stateCheck.nextPath, request.url));
-
-    response.cookies.set(SESSION_COOKIE_NAME, user.id, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
-    });
-
-    return response;
   } catch (error) {
-    console.error('OAuth callback error:', error);
-    return NextResponse.json({ error: 'OAuth callback failed' }, { status: 500 });
+    const detail = getErrorMessage(error);
+    console.error('OAuth user persist error:', detail);
+    return NextResponse.json(
+      { error: 'OAuth user persist failed', detail },
+      { status: 500 },
+    );
   }
+
+  const response = NextResponse.redirect(new URL(stateCheck.nextPath, request.url));
+
+  response.cookies.set(SESSION_COOKIE_NAME, user.id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  return response;
 }
